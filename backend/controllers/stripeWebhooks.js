@@ -4,7 +4,7 @@ import Booking from '../models/Booking.js'
 
 export const stripeWebhooks = async (request, response)=>{
     const stripeIntance = new stripe(process.env.STRIPE_SECRET_KEY)
-    const sig = Request.headers["stripe-signature"];
+    const sig = request.headers["stripe-signature"];
 
     let event;
 
@@ -23,6 +23,7 @@ export const stripeWebhooks = async (request, response)=>{
 
                 const session = sessionList.data[0];
                 const { bookingId } = session.metadata;
+                console.log(bookingId)
 
                 await Booking.findByIdAndUpdate(bookingId, {
                     isPaid: true,
@@ -35,7 +36,7 @@ export const stripeWebhooks = async (request, response)=>{
         }
         response.json({received: true})
     } catch(error){
-        console.error("Webhook processing error:", err);
+        console.error("Webhook processing error:", error);
         response.status(500).send("Internal Server Error")
     }
 }

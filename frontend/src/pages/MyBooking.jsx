@@ -5,6 +5,7 @@ import BlurCircle from '../components/BlurCircle'
 import timeFormat from '../lib/timeFormate'
 import { dateFormat } from '../lib/dateFormate'
 import { useAppContext } from '../context/AppContext'
+import { Link } from 'react-router-dom'
 
 const MyBooking = () => {
 
@@ -20,7 +21,6 @@ const MyBooking = () => {
         {headers: {
           Authorization: `Bearer ${await getToken()}`
         }})
-        console.log(data)
         if(data.success){
           setBookings(data.bookings)
         }
@@ -59,7 +59,7 @@ const MyBooking = () => {
           <div className='flex flex-col md:items-end md:text-right justify-between p-3'>
             <div className='flex items-center gap-3'>
               <p className='text-xl font-semibold mb-2'>{currency}{item.amount}</p>
-              {!item.isPaid && <button className='bg-primary hover:bg-primary-dull px-3 py-1 mb-2 text-base rounded-full font-medium cursor-pointer'>Pay Now</button> }
+              {!item.isPaid  && <Link to={item.paymentLink} className='bg-primary hover:bg-primary-dull px-3 py-1 mb-2 text-base rounded-full font-medium cursor-pointer'>Pay Now </Link> }
             </div>
             <div className='text-sm'>
               <p><span className='text-gray-400'>Total Tickes:</span> {item.bookedSeats.length}</p>
