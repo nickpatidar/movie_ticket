@@ -20,8 +20,12 @@ export const stripeWebhooks = async (request, response)=>{
                 const sessionList = await stripeIntance.checkout.sessions.list({
                     payment_intent: paymentIntent.id
                 })
+                console.log(sessionList)
+
 
                 const session = sessionList.data[0];
+                console.log(session)
+
                 const { bookingId } = session.metadata;
                 console.log(bookingId)
 
