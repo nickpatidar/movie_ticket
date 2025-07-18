@@ -1,53 +1,42 @@
-import Booking from '../models/Booking.js';
-import Stripe from 'stripe';
+import stripe from 'stripe'
+import Booking from '../models/Booking.js'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-export const stripeWebhooks = async (req, res) => {
-  const sig = req.headers['stripe-signature'];
+export const stripeWebhooks = async (request, response)=>{
+    const stripeIntance = new stripe(process.env.STRIPE_SECRET_KEY)
+    const sig = request.headers["stripe-signature"];
 
-  let event;
+    let event;
 
-  try {
-    event = stripe.webhooks.constructEvent(
-      req.body,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
-  } catch (err) {
-    console.log(`Webhook signature verification failed: ${err.message}`);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
-  }
-
-  if (event.type === 'checkout.session.completed') {
-    const session = event.data.object;
-
-    const bookingId = session.metadata.bookingId;
-
-    if (!bookingId) {
-      console.log('No bookingId in session metadata');
-      return res.status(400).send('Missing bookingId in metadata');
+    try{
+        event = stripeIntance.webhooks.constructEvent(request.body, sig, process.env.STRIPE_WEBHOOK_SECRET)
+    } catch(error){
+        return response.status(400).send(`Webhook Error: ${error.message}`);
     }
+    try{
+        switch (event.type){
+            case "payment_intent.succeeded":{
+                const paymentIntent = event.data.object;
+                const sessionList = await stripeIntance.checkout.sessions.list({
+                    payment_intent: paymentIntent.id
+                })
 
-    try {
-      const booking = await Booking.findById(bookingId);
-      if (!booking) {
-        console.log('Booking not found:', bookingId);
-        return res.status(404).send('Booking not found');
-      }
+                const session = sessionList.data[0];
+                const { bookingId } = session.metadata;
+                console.log(bookingId)
 
-      booking.isPaid = true;
-      await booking.save();
-
-      console.log('Booking updated as paid:', bookingId);
-      res.json({ received: true });
-    } catch (error) {
-      console.error('Error updating booking:', error);
-      res.status(500).send('Server error');
+                await Booking.findByIdAndUpdate(bookingId, {
+                    isPaid: true,
+                    paymentLink: ""
+                })
+                break
+            }
+            default:
+                console.log('Unhandled event type:', event.type)
+        }
+        response.json({received: true})
+    } catch(error){
+        console.error("Webhook processing error:", error);
+        response.status(500).send("Internal Server Error")
     }
-
-  } else {
-    // Return 200 for other events we don't handle
-    res.json({ received: true });
-  }
-};
+}
