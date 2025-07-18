@@ -1,4 +1,7 @@
 import { Inngest } from "inngest";
+import Booking from "../models/Booking.js";
+import User from "../models/User.js";
+import Show from "../models/Show.js";
 
 export const inngest = new Inngest({ id: "movie-ticket-booking" });
 
@@ -13,7 +16,7 @@ const syncUserCreation = inngest.createFunction(
             name: first_name + ' ' + last_name,
             image: image_url,
         }
-        await UserActivation.create(userData);
+        await User.create(userData);
     }
 )
 
@@ -22,7 +25,7 @@ const syncUserDeletion = inngest.createFunction(
     { event: 'clerk/user.deleted' },
     async ({ event }) => {
         const { id } = event.data;
-        await UserActivation.findByIdAndDelete(id);
+        await User.findByIdAndDelete(id);
     }
 )
 
@@ -37,12 +40,37 @@ const syncUserUpdation = inngest.createFunction(
             name: first_name + ' ' + last_name,
             image: image_url,
         }
-        await UserActivation.findByIdAndUpdate(id, userData)
+        await User.findByIdAndUpdate(id, userData)
+    }
+)
+
+const releaseSeatsAndDeleteBooking = inngest.createFunction(
+    {id: "release-seats-delete-booking"},
+    {event: "app/checkpayment"},
+    async ({ event, step })=>{
+        const tenMinutesLater = new Date(Date.now() + 10 * 60 * 1000);
+        await step.sleepUntil('wait-for-10-minutes', tenMinutesLater);
+
+        await step.run('check-payment-status', async ()=>{
+            const bookingId = event.data.bookingId;
+            const booking = await Booking.findById(bookingId)
+
+            if(!booking.isPaid){
+                const show = await Show.findById(booking.show);
+                booking.bookedSeats.forEach((seat)=>{
+                    delete show.occupiedSeats[seat]
+                })
+                show.markModified('occupiedSeats')
+                await show.save()
+                await Booking.findByIdAndDelete(booking._id)
+            }
+        })
     }
 )
 
 export const functions = [
     syncUserCreation,
     syncUserDeletion,
-    syncUserUpdation
+    syncUserUpdation,
+    releaseSeatsAndDeleteBooking
 ];
